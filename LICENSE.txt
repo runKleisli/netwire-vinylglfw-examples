@@ -1,4 +1,4 @@
-Written by runKleisli. Portions of code & comments copied from netwire-input-glfw example (Copyright 2014 Pavel Krajcevski) for educational & research purposes.
+Written by runKleisli. Portions of code & comments copied from netwire-input-glfw (Copyright 2014 Pavel Krajcevski) for educational & research purposes.
 
 
 

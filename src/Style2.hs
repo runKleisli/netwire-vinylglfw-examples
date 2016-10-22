@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, TypeOperators #-}
 
 module Main where
 
@@ -20,7 +20,7 @@ import qualified Data.Vinyl as Vy ((<+>))
 import Linear (V2(..), V3(..))
 import System.Directory (getCurrentDirectory, setCurrentDirectory)
 
-import CursorProgram (cursorCircle)
+import CursorProgram (cursorCircle, CursorCircleStyle)
 
 
 
@@ -28,7 +28,14 @@ import CursorProgram (cursorCircle)
 type GameMonad = GLFWInputT IO
 type GameSession = Session IO (Timed Float ())
 
-type CursorCircleData = FieldRec [ '("offset", V2 GL.GLfloat), '("color", V3 GL.GLfloat) ]
+-- This wire takes a Vinyl record whose fields have those of the passed in rendering
+-- function as a subset and renders according to that function. In reality, this wire
+-- doesn't need to be a wire, and could just be a monad to render, but this way we can
+-- render what we need without having to go through the plumbing of our main game loop
+renderWire :: (Monoid e, renderdata <: i) =>
+	(FieldRec renderdata -> IO ())
+	-> Wire s e GameMonad (FieldRec i) ()
+renderWire rfn = mkGen_ $ \appInfo -> lift $ rfn (rcast appInfo) >> (return $ Right ())
 
 -- This wire produces the position of the circle. It simply follows the mouse cursor
 -- but negates the y-value. The origin of the mouse coordinates are in the top left
@@ -52,16 +59,6 @@ colorWire =
   -- Otherwise, pulsate based on the amount of time passed
   (timeF >>> (arr (cos &&& sin)) >>> (arr $ \(x, y) -> V3 x y 1))
 
--- This wire simply takes a vertex position and color and renders according to the
--- passed in renderFn. In reality, this wire doesn't need to be a wire, and could just
--- be a monad to render, but this way we can render what we need without having to
--- go through the plumbing of our main game loop
-renderWire :: Monoid e =>
-	(CursorCircleData -> IO ())
-	-> Wire s e GameMonad (V2 GL.GLfloat, V3 GL.GLfloat) ()
-renderWire rfn = mkGen_ $ \(pos, color) -> lift
-	$ rfn (SField =: pos Vy.<+> SField =: color) >> (return $ Right ())
-
 -- Wire that behaves like the identity wire until Q is pressed, then inhibits forever.
 -- We can compose our main gameWire with this wire to simply quit the program when q is pressed
 quitWire :: Monoid e => Wire s e GameMonad a a
@@ -73,9 +70,12 @@ quitWire = (mkId &&& eventWire) >>> (rSwitch mkId)
 -- This is our main game wire, it feeds the position and color into the rendering loop
 -- and finally quits if q is pressed.
 gameWire :: (HasTime t s, Monoid e) =>
-	(CursorCircleData -> IO ())
+	(FieldRec CursorCircleStyle -> IO ())
 	-> Wire s e GameMonad a ()
-gameWire rfn = posWire &&& colorWire >>> (renderWire rfn) >>> quitWire
+gameWire rfn = posWire &&& colorWire
+	>>> arr (\(pos, color) -> SField =: pos Vy.<+> SField =: color :: FieldRec CursorCircleStyle)
+	>>> (renderWire rfn)
+	>>> quitWire
 
 run :: GLFW.Window -> GLFWInputControl -> IO ()
 run win ictl = do

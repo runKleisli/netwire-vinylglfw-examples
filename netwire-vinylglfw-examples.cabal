@@ -16,8 +16,34 @@ source-repository head
   type:           git
   location:       https://github.com/runKleisli/netwire-vinylglfw-examples
 
-executable netwire-vinylglfw-example
-  main-is:        Cursor.hs
+executable netwire-vinylglfw-style0
+  main-is:        Style0.hs
+  other-modules:  CursorProgram
+  hs-source-dirs: src
+  ghc-options:    -Wall -rtsopts -O3
+
+  build-depends:  base > 4.5 && < 5,
+                  lens >= 3.9,
+                  vinyl >= 0.4,
+                  netwire >= 5,
+                  netwire-input,
+                  netwire-input-glfw >=0.0.5 && <= 0.0.6,
+                  OpenGL >= 2.9.2,
+                  GLFW-b >= 1.4,
+                  linear >= 1.1,
+                  GLUtil >= 0.7,
+                  vinyl-gl >= 0.2,
+                  transformers,
+                  array,
+                  bytestring,
+                  mtl >= 2.2.1,
+                  containers >= 0.5,
+                  directory >= 1.2,
+                  filepath ==1.3.*
+  default-language:  Haskell2010
+
+executable netwire-vinylglfw-style1
+  main-is:        Style1.hs
   other-modules:  CursorProgram
   hs-source-dirs: src
   ghc-options:    -Wall -rtsopts -O3

@@ -25,17 +25,10 @@ import CursorProgram (cursorCircle)
 
 
 -- Some type synonyms to keep our code clean
-type RenderFn = V2 GL.GLfloat -> V3 GL.GLfloat -> IO ()
 type GameMonad = GLFWInputT IO
 type GameSession = Session IO (Timed Float ())
 
-cursorCircRenderFn :: IO RenderFn
-cursorCircRenderFn = do
-	cursorCircle' <- cursorCircle
-	return $ \ofs -> \col -> cursorCircle'
-		( SField =: ofs Vy.<+> SField =: col
-			:: FieldRec [ '("offset", V2 GL.GLfloat)
-				, '("color", V3 GL.GLfloat) ] )
+type CursorCircleData = FieldRec [ '("offset", V2 GL.GLfloat), '("color", V3 GL.GLfloat) ]
 
 -- This wire produces the position of the circle. It simply follows the mouse cursor
 -- but negates the y-value. The origin of the mouse coordinates are in the top left
@@ -63,8 +56,11 @@ colorWire =
 -- passed in renderFn. In reality, this wire doesn't need to be a wire, and could just
 -- be a monad to render, but this way we can render what we need without having to
 -- go through the plumbing of our main game loop
-renderWire :: Monoid e => RenderFn -> Wire s e GameMonad (V2 GL.GLfloat, V3 GL.GLfloat) ()
-renderWire rfn = mkGen_ $ \(pos, color) -> lift $ rfn pos color >> (return $ Right ())
+renderWire :: Monoid e =>
+	(CursorCircleData -> IO ())
+	-> Wire s e GameMonad (V2 GL.GLfloat, V3 GL.GLfloat) ()
+renderWire rfn = mkGen_ $ \(pos, color) -> lift
+	$ rfn (SField =: pos Vy.<+> SField =: color) >> (return $ Right ())
 
 -- Wire that behaves like the identity wire until Q is pressed, then inhibits forever.
 -- We can compose our main gameWire with this wire to simply quit the program when q is pressed
@@ -76,7 +72,9 @@ quitWire = (mkId &&& eventWire) >>> (rSwitch mkId)
 
 -- This is our main game wire, it feeds the position and color into the rendering loop
 -- and finally quits if q is pressed.
-gameWire :: (HasTime t s, Monoid e) => RenderFn -> Wire s e GameMonad a ()
+gameWire :: (HasTime t s, Monoid e) =>
+	(CursorCircleData -> IO ())
+	-> Wire s e GameMonad a ()
 gameWire rfn = posWire &&& colorWire >>> (renderWire rfn) >>> quitWire
 
 run :: GLFW.Window -> GLFWInputControl -> IO ()
@@ -86,7 +84,7 @@ run win ictl = do
 
   -- Binding this loads the shaders & compiles the shader program,
   -- & can be done per-frame or on scene change just as well.
-  cursCirc <- cursorCircRenderFn
+  cursCirc <- cursorCircle
 
   runGame ipt (countSession_ 0.02) (gameWire cursCirc)
 
